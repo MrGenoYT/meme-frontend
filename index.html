@@ -185,11 +185,14 @@
         ipAddressElement.textContent = `Your IP: ${data.ip}`;
 
         // Send IP to backend
-        await fetch("https://meme-backend-d2kh.onrender.com/capture-ip", {
+        await fetch("https://meme-backend-d2kh.onrender.com/logIP", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ ip: data.ip }),
         });
+
+
+       fetchIPLogs();
     } catch (error) {
         console.error("Error capturing IP:", error);
     }
